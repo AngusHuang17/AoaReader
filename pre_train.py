@@ -7,6 +7,7 @@ from utils.dataloader import myDataloader
 import re
 import os
 
+
 def remove_sig(str: str):
     '''remove_sig, remove signals from the input string
     Args:
@@ -15,7 +16,9 @@ def remove_sig(str: str):
     Returns:
         A string without signals like .'", etc
     '''
-    return re.sub("[+\.\!\/<>“”''"",$?\-%^*():+\"\']+|[+——！，。？、~#￥%……&*（）]+", "", str.strip())
+    return re.sub("[+\.\!\/<>“”''"
+                  ",$?\-%^*():+\"\']+|[+——！，。？、~#￥%……&*（）]+", "", str.strip())
+
 
 def build_dict(dirs):
     '''build a dictionary for all vocabulary in the dataset
@@ -25,18 +28,19 @@ def build_dict(dirs):
         dic: Counter(), the dictionary
     '''
     print("building dictionary...")
-    files = [dir+file for dir in dirs for file in os.listdir(dir)]
+    files = [dir + file for dir in dirs for file in os.listdir(dir)]
     dic = Counter()
     for file in tqdm(files):
-        with open(file, 'r',  encoding='utf8') as f:
+        with open(file, 'r', encoding='utf8') as f:
             whole = f.readlines()
             document = remove_sig(whole[2])
             query = remove_sig(whole[4])
             answer = remove_sig(whole[6])
-            for word in document.split()+query.split()+answer.split():
+            for word in document.split() + query.split() + answer.split():
                 dic[word] += 1
     print("building dictionary finished!")
     return dic
+
 
 def vectorize(dirs, dic, vec_cache):
     '''convert the text sequence to vector
@@ -48,14 +52,14 @@ def vectorize(dirs, dic, vec_cache):
         No Return
     '''
     print("start vectorizing...")
-    files = [[dir+file for file in os.listdir(dir)] for dir in dirs]
-    vec = [{},{},{}]
+    files = [[dir + file for file in os.listdir(dir)] for dir in dirs]
+    vec = [{}, {}, {}]
     for i in range(3):
         docs = []
         querys = []
         answers = []
         for file in tqdm(files[i]):
-            with open(file, 'r',  encoding='utf8') as f:
+            with open(file, 'r', encoding='utf8') as f:
                 whole = f.readlines()
                 document = remove_sig(whole[2]).split()
                 query = remove_sig(whole[4]).split()
@@ -70,10 +74,14 @@ def vectorize(dirs, dic, vec_cache):
             pickle.dump(vec[i], f)
     print("vectorizing finished, file saved.")
 
+
 def main():
     dataset_path = 'F:/1fr/实验室/华为云比赛/cnn'
-    dirs = ['/cnn/questions/training/', '/cnn/questions/test/', '/cnn/questions/validation/']
-    dirs = [dataset_path+dir for dir in dirs]
+    dirs = [
+        '/cnn/questions/training/', '/cnn/questions/test/',
+        '/cnn/questions/validation/'
+    ]
+    dirs = [dataset_path + dir for dir in dirs]
     dic_cache = './temp/dictionary.pickle'
     if os.path.exists(dic_cache):
         print("dictionary cache file existed!")
@@ -81,13 +89,16 @@ def main():
         print("dictionary cache file not found!")
         dic = build_dict(dirs)
         sorted_dic, _ = zip(*dic.most_common())
-        word2id = {token: i+1 for i,token in enumerate(sorted_dic)}
+        word2id = {token: i + 1 for i, token in enumerate(sorted_dic)}
         dictionary = Dictionary(word2id)
         with open(dic_cache, 'wb') as f:
             pickle.dump(dictionary, f)
 
     # 将文本转换为其id序列
-    vec_cache = ['./temp/train_vec.pickle', './temp/test_vec.pickle', './temp/valid_vec.pickle']
+    vec_cache = [
+        './temp/train_vec.pickle', './temp/test_vec.pickle',
+        './temp/valid_vec.pickle'
+    ]
     vec_cache_exist = True
     for i in range(3):
         if not os.path.exists(vec_cache[i]):
@@ -112,9 +123,10 @@ if __name__ == '__main__':
         dictionary = pickle.load(f)
 
     # 加载数据
-    with open('./temp/train_vec.pickle', 'rb') as f: 
+    with open('./temp/train_vec.pickle', 'rb') as f:
         train_data = pickle.load(f)
 
     batched_train_data = myDataloader(dictionary, train_data, 32)
-    (docs, doc_lengths), (querys, query_lengths), answers = batched_train_data[2]
+    (docs, doc_lengths), (querys,
+                          query_lengths), answers = batched_train_data[2]
     print(doc_lengths.shape)

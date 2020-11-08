@@ -1,5 +1,4 @@
 class Dictionary:
-
     def __init__(self, word2id):
         self.word2id = word2id
         self.id2word = {id: word for word, id in word2id.items()}
