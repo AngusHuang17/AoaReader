@@ -1,3 +1,4 @@
 data/cnn
 .vscode/
 temp/*.pickle
+test.*

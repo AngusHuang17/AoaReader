@@ -81,7 +81,7 @@ def main():
         print("dictionary cache file not found!")
         dic = build_dict(dirs)
         sorted_dic, _ = zip(*dic.most_common())
-        word2id = {token: i for i,token in enumerate(sorted_dic)}
+        word2id = {token: i+1 for i,token in enumerate(sorted_dic)}
         dictionary = Dictionary(word2id)
         with open(dic_cache, 'wb') as f:
             pickle.dump(dictionary, f)
