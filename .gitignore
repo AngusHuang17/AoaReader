@@ -1,4 +1,3 @@
 data/cnn
 .vscode/
 temp/*.pickle
-*.ipynb

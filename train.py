@@ -52,7 +52,7 @@ def main():
         dictionary = pickle.load(f)
 
     # 加载数据
-    with open(params.traindata, 'rb') as tr, open(params.traindata, 'rb') as v:
+    with open(params.traindata, 'rb') as tr, open(params.validdata, 'rb') as v:
         train_vec = pickle.load(tr)
         valid_vec = pickle.load(v)
 
@@ -62,7 +62,7 @@ def main():
     # print(doc_lengths.shape)
 
     # 模型实例化
-    model = ATT_model(vocab_size=dictionary.len, embed_dim=params.embedding_size, hidden_dim=params.gru_size, dropout_rate=params.dropout, 0)
+    model = ATT_model(vocab_size=dictionary.len, embed_dim=params.embedding_size, hidden_dim=params.gru_size, dropout_rate=params.dropout, PAD=0)
 
     # TODO: train the model
 
