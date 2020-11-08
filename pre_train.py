@@ -71,7 +71,7 @@ def vectorize(dirs, dic, vec_cache):
     print("vectorizing finished, file saved.")
 
 def main():
-    dataset_path = 'C:/Users/angus/Desktop/论文复现/code/train_input/datasets'
+    dataset_path = 'F:/1fr/实验室/华为云比赛/cnn'
     dirs = ['/cnn/questions/training/', '/cnn/questions/test/', '/cnn/questions/validation/']
     dirs = [dataset_path+dir for dir in dirs]
     dic_cache = './temp/dictionary.pickle'
