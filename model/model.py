@@ -10,7 +10,7 @@ def softmax_mask(input, mask, axis=1):
     return softmax
 
 class ATT_model(nn.Module):
-    def __init__(self, vocab_size, embed_dim, hidden_dim, dropout_rate, bidirectional=True, PAD):
+    def __init__(self, vocab_size, embed_dim, hidden_dim, dropout_rate, bidirectional=True, PAD=0):
         super(AOA_model, self).__init__()
         self.vocab_size = vocab_size
         self.embed_dim = embed_dim
