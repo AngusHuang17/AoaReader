@@ -111,4 +111,4 @@ class myDataloader():
         answers = torch.tensor(self.answer[index *
                                            self.batch_size:(index+1)*self.batch_size])
 
-        return (docs, doc_lengths), (querys, query_lengths), answers
+        return (docs.long(), doc_lengths), (querys.long(), query_lengths), answers
