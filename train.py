@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import argparse
 import pickle
 from utils.dict import Dictionary
@@ -65,5 +66,3 @@ def main():
     model = ATT_model(vocab_size=dictionary.len, embed_dim=params.embedding_size, hidden_dim=params.gru_size, dropout_rate=params.dropout, PAD=0)
 
     # TODO: train the model
-
-
