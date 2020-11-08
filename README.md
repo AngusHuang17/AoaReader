@@ -6,27 +6,48 @@ This is a simple implementation of paper [*Attention-over-Attention Neural Netwo
 ## About the folder structure
 
 ```
+AoaReader
+├─
 │  .gitignore
 │  pre_train.py
-│  Readme.md
+│  README.md
+│  test.ipynb
 │  test.py
-│  test.txt
 │  train.py
 │  
+├─.vscode
+│      settings.json
+│      
 ├─data
-│  └─cnn
+│      Readme.md
+│      
 ├─model
-│  └─model.py
+│  │  model.py
+│  │  __init__.py
+│  │  
+│  └─__pycache__
+│          model.cpython-36.pyc
+│          __init__.cpython-36.pyc
+│          
 ├─temp
-│  ├─dictionary.pickle
-│  ├─train_vec.pickle
-│  ├─test_vec.pickle
-│  └─valid_vec.pickle
-├─utils
-│  ├─__init__.py
-│  ├─dict.py
-│  └─dataloader.py
-└
+│      dictionary.pickle
+│      Readme.md
+│      test_vec.pickle
+│      train_vec.pickle
+│      valid_vec.pickle
+│      
+└─utils
+    │  dataloader.py
+    │  dict.py
+    │  __init__.py
+    │  
+    └─__pycache__
+            dataloader.cpython-36.pyc
+            dataloader.cpython-38.pyc
+            dict.cpython-36.pyc
+            dict.cpython-38.pyc
+            __init__.cpython-36.pyc
+            __init__.cpython-38.pyc
 ```
 
 - AoaReader
@@ -46,7 +67,7 @@ This is a simple implementation of paper [*Attention-over-Attention Neural Netwo
 ## How to run
 
 1. Download the dataset from [here](https://cs.nyu.edu/~kcho/DMQA/).
-2. Run `rm ./temp/*` to delete the temp files generate by us. Also, you can choose to use them instead of deleting. (It will save several minutes to deal with the data). Attention, if you choose to use our temp files, you can skip step 1 but you should change some lines in the `pre_train.py` to stop accessing dataset files.
+2. Run `rm ./temp/*.pickle` to delete the temp files generate by us. Also, you can choose to use them instead of deleting. (It will save several minutes to deal with the data). Attention, if you choose to use our temp files, you can skip step 1 but you should change some lines in the `pre_train.py` to stop accessing dataset files.
 3. Run `python pre_train.py`.
 4. Run `python train.py`.
 5. Run `python test.py`.
