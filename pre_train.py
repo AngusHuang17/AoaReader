@@ -76,7 +76,8 @@ def vectorize(dirs, dic, vec_cache):
 
 
 def main():
-    dataset_path = 'F:/1fr/实验室/华为云比赛/cnn'
+    print('请输入cnn数据集文件夹的路径（path）：注意，目录结构为 path/cnn/questions, path/cnn/valid, path/cnn/test')
+    dataset_path = input()
     dirs = [
         '/cnn/questions/training/', '/cnn/questions/test/',
         '/cnn/questions/validation/'
@@ -117,16 +118,16 @@ def main():
 if __name__ == '__main__':
     main()
 
-    # 下面是在train用来加载数据的例子
+    # 下面是在train用来加载数据的例子，实际使用时可以注释掉
     # 加载字典
-    with open('./temp/dictionary.pickle', 'rb') as f:
-        dictionary = pickle.load(f)
+    # with open('./temp/dictionary.pickle', 'rb') as f:
+    #     dictionary = pickle.load(f)
 
-    # 加载数据
-    with open('./temp/train_vec.pickle', 'rb') as f:
-        train_data = pickle.load(f)
+    # # 加载数据
+    # with open('./temp/train_vec.pickle', 'rb') as f:
+    #     train_data = pickle.load(f)
 
-    batched_train_data = myDataloader(dictionary, train_data, 32)
-    (docs, doc_lengths), (querys,
-                          query_lengths), answers = batched_train_data[2]
-    print(doc_lengths.shape)
+    # batched_train_data = myDataloader(dictionary, train_data, 32)
+    # (docs, doc_lengths), (querys,
+    #                       query_lengths), answers = batched_train_data[2]
+    # print(doc_lengths.shape)

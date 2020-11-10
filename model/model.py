@@ -37,40 +37,45 @@ class ATT_model(nn.Module):
         self.hidden_dim = hidden_dim
         self.dropout_rate = dropout_rate
 
-        # TODO: 考虑是否需要在embedding前加dropout层
-
         self.embedding = nn.Embedding(self.vocab_size,
                                       self.embed_dim,
                                       padding_idx=PAD)
         self.embedding.weight.data.uniform_(-0.05, 0.05)
 
+        self.dropout = nn.Dropout(p=self.dropout_rate)
+
         self.BiGRU = torch.nn.GRU(input_size=self.embed_dim,
                                   hidden_size=self.hidden_dim,
-                                  dropout=self.dropout_rate,
                                   bidirectional=bidirectional,
                                   batch_first=True)
 
         for weight in self.BiGRU.parameters():
             if len(weight.size()) > 1:
-                weigth_init.orthogonal(weight.data)
+                weigth_init.orthogonal_(weight.data)
 
-    def forward(self, documents, doc_lens, querys, query_lens):
+    def forward(self, documents, doc_lens, querys, query_lens, answers):
 
         (sorted_documents,
          sorted_doc_lens), recover_idx_doc = sort_batch(documents, doc_lens)
         (sorted_querys, sorted_query_lens), recover_idx_query = sort_batch(
             querys, query_lens)
 
-        doc_embedding = pack(self.embedding(sorted_documents),
+        doc_embedding = self.embedding(sorted_documents)
+        query_embedding = self.embedding(sorted_querys)
+
+        doc_embedding_drop = self.dropout(doc_embedding)
+        query_embedding_drop = self.dropout(query_embedding)
+
+        doc_embedding_packed = pack(doc_embedding_drop,
                              sorted_doc_lens,
                              batch_first=True)
-        query_embedding = pack(self.embedding(sorted_querys),
+        query_embedding_packed = pack(query_embedding_drop,
                                sorted_query_lens,
                                batch_first=True)
 
         # GRU
-        document_gru_output, _ = self.BiGRU(doc_embedding, None)
-        query_gru_output, _ = self.BiGRU(query_embedding, None)
+        document_gru_output, _ = self.BiGRU(doc_embedding_packed, None)
+        query_gru_output, _ = self.BiGRU(query_embedding_packed, None)
 
         document_gru_output, _ = unpack(document_gru_output, batch_first=True)
         query_gru_output, _ = unpack(query_gru_output, batch_first=True)
@@ -103,8 +108,30 @@ class ATT_model(nn.Module):
             beta_sum)
         AoA_output = torch.bmm(alpha, beta_aver.transpose(2, 1))
 
-        word_prob = (AoA_output)
+        answers_expand = answers.expand_as(documents)
+        answer_masks = answers_expand == documents
 
-        # TODO: 给出预测的单词，即概率最大的；
+        # probs 表示真实答案在预测中的概率
+        probs = torch.zeros(answers.shape[0])
 
-        return word_prob, alpha, beta, beta_aver
+        for i in range(answers.shape[0]):
+            probs[i] = torch.sum(
+                torch.masked_select(AoA_output[i].squeeze(), answer_masks[i]))
+
+        # pred_answers 表示从documents中选取概率最大的单词作为预测
+        pred_answers = []
+        for j, document in enumerate(documents):
+            dict = {}
+            len = doc_lens[j]
+            s = AoA_output[j].squeeze()
+            for i, word in enumerate(document):
+                if i >= len:
+                    break
+                if word not in dict:
+                    dict[word] = s[i].data
+                else:
+                    dict[word] += s[i].data
+            pred_answers.append(max(dict, key=dict.get))
+        pred_answers = torch.LongTensor(pred_answers)
+
+        return probs, pred_answers

@@ -28,11 +28,11 @@ def get_preds(docs, probs, lengths):
 
     return indexs
 
+
 class myDataloader():
     '''Dataloader is a class which aims to convert sequence vector to one-hot matrix
     and bacth the data
     '''
-
     def __init__(self, dic: Dictionary, data, batch_size: int):
         '''Initialize the dataloader
 
@@ -48,41 +48,12 @@ class myDataloader():
         self.answer = data['answer']
         self.sample_num = len(self.document)
         self.batch_num = math.ceil(self.sample_num / self.batch_size)
-        # files = [dir+filename for filename in os.listdir(dir)]
-        # doc = []
-        # query = []
-        # answer = []
-        # for file in tqdm(files):
-        #     with open(file, 'r',  encoding='utf8') as f:
-        #         whole = f.readlines()
-        #         document = remove_sig(whole[2]).split()
-        #         query = remove_sig(whole[4]).split()
-        #         answer = remove_sig(whole[6])
-        #         doc.append([self.dic.getId(word) for word in document])
-        #         query.append([self.dic.getId(word) for word in query])
-        #         answer.append([self.dic.getId(word) for word in answer.split()])
-        # self.vector['document'] = torch.tensor(doc)
-        # self.vector['query'] = torch.tensor(query)
-        # self.vector['answer'] = torch.tensor(answer)
 
-    # def _vec2onehot(self):
-    #     dic_len = self.dic.len
-    #     for f in self.vec:
-    #         document_vec = torch.tensor([[word] for word in f['document']])
-    #         query_vec = torch.tensor([[word] for word in f['query']])
-    #         answer_vec = torch.tensor(f['answer'])
-    #         onehot_file = {
-    #             'document': torch.zeros(self.seq_len['document'], dic_len).scatter_(1, document_vec, 1),
-    #             'query': torch.zeros(self.seq_len['query'], dic_len).scatter_(1, query_vec, 1),
-    #             'answer': answer_vec
-    #         }
-    #         self.onehot.append(onehot_file)
 
     def shuffle(self):
         '''shuffle the dataset
         '''
-        data = list(zip(self.document,
-                        self.query, self.answer))
+        data = list(zip(self.document, self.query, self.answer))
         self.document, self.query, self.answer = zip(
             *[data[i] for i in torch.randperm(len(data))])
 
@@ -102,13 +73,17 @@ class myDataloader():
         assert index < self.batch_num, "index %d > batch num %d" % (
             index, self.batch_num)
 
-        docs, doc_lengths = self._batch(
-            self.document[index * self.batch_size:(index+1)*self.batch_size])
+        start_index = index * self.batch_size
+        if index == self.batch_num - 1:
+            end_index = self.sample_num
+        else:
+            end_index = (index + 1) * self.batch_size
 
-        querys, query_lengths = self._batch(
-            self.query[index * self.batch_size:(index+1)*self.batch_size])
+        docs, doc_lengths = self._batch(self.document[start_index:end_index])
 
-        answers = torch.tensor(self.answer[index *
-                                           self.batch_size:(index+1)*self.batch_size])
+        querys, query_lengths = self._batch(self.query[start_index:end_index])
 
-        return (docs.long(), doc_lengths), (querys.long(), query_lengths), answers
+        answers = torch.tensor(self.answer[start_index:end_index])
+
+        return (docs.long(), doc_lengths), (querys.long(),
+                                            query_lengths), answers
