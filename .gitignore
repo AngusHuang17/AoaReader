@@ -2,3 +2,5 @@ data/cnn
 .vscode/
 temp/*.pickle
 data/*tgz
+./model/__pycache__
+./utils/__pycache__
