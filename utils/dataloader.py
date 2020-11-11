@@ -4,6 +4,7 @@ import os
 from tqdm import tqdm
 import pickle
 import math
+from torch.autograd import Variable
 
 
 def get_preds(docs, probs, lengths):
@@ -49,7 +50,6 @@ class myDataloader():
         self.sample_num = len(self.document)
         self.batch_num = math.ceil(self.sample_num / self.batch_size)
 
-
     def shuffle(self):
         '''shuffle the dataset
         '''
@@ -65,9 +65,9 @@ class myDataloader():
             for j in range(lengths[i]):
                 out[i][j] = data[i][j]
         if output_lengths:
-            return out, lengths
+            return out.long(), lengths
         else:
-            return out
+            return out.long()
 
     def __getitem__(self, index):
         assert index < self.batch_num, "index %d > batch num %d" % (
@@ -85,5 +85,10 @@ class myDataloader():
 
         answers = torch.tensor(self.answer[start_index:end_index])
 
-        return (docs.long(), doc_lengths), (querys.long(),
-                                            query_lengths), answers
+        # docs = Variable(docs, requires_grad=False)
+        # doc_lengths = Variable(doc_lengths, requires_grad=False)
+        # querys = Variable(querys, requires_grad=False)
+        # query_lengths = Variable(query_lengths, requires_grad=False)
+        # answers = Variable(answers, requires_grad=False)
+
+        return (docs, doc_lengths), (querys, query_lengths), answers
