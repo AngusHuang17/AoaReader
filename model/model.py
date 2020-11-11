@@ -11,16 +11,16 @@ def sort_batch(data, lens):
     sorted_lens, sorted_idx = torch.sort(lens, dim=0, descending=True)
     sorted_data = data[sorted_idx]
     _, recover_idx = torch.sort(sorted_idx, dim=0, descending=False)
-    return (sorted_data, sorted_lens), recover_idx
+    return (sorted_data, sorted_lens.cuda()), recover_idx.cuda()
 
 
 def softmax_mask(input, mask, axis=1, epsilon=1e-12):
     shift, _ = torch.max(input, axis, keepdim=True)
-    shift = shift.expand_as(input)
-    input = torch.exp(input - shift) * mask
+    shift = shift.expand_as(input).cuda()
+    input = torch.exp(input - shift) * mask.cuda()
     sum = torch.sum(input, axis, keepdim=True).expand_as(input)
     softmax = input / (sum + epsilon)
-    return softmax
+    return softmax.cuda()
 
 
 class ATT_model(nn.Module):
