@@ -5,7 +5,7 @@ from utils.dict import Dictionary
 from utils.dataloader import myDataloader
 from model.model import ATT_model
 from torch.optim import Adam
-
+import time
 '''
 step1: 数据读入
 step2: 实例化模型
@@ -35,10 +35,11 @@ parser.add_argument(
     'Path to the dictionary file from pre_train.py, default value is \'./temp/dictionary.pickle\''
 )
 parser.add_argument('-model_path',
-                    default='model',
+                    default='./model',
                     help="""Model filename (the model will be saved as
-                    <save_model>_epochN_ACC.pt to 'models/' directory, where ACC is the
+                    model_epochN_ACC.pt to <model_path> directory, where ACC is the
                     validation accuracy""")
+parser.add_argument('-log_path', default='./', help="Path to save log file.")
 
 parser.add_argument('-batch_size', type=int, default=32, help='batch size')
 parser.add_argument('-embedding_size',
@@ -83,23 +84,52 @@ def loss_func(true_answers, pred_answers, probs):
             correct_num += 1
     return loss, correct_num
 
+def eval(model, data):
+    total_correct = 0
+    total_loss = 0
+    total_sample_num = 0
 
-# TODO: 1.是否设置检查点； 2.完善valid的评估
+    batch_num = data.batch_num
+    
+    model.eval()
+    for i in range(batch_num):
+        (docs, doc_lengths), (querys, query_lengths), answers = data[i]
+        probs, pred_answers = model(docs.cuda(), doc_lengths.cuda(), querys.cuda(),
+                                        query_lengths.cuda(), answers.cuda())
+        loss, pred_correct = loss_func(answers, pred_answers, probs)
+
+        total_loss += loss
+        total_correct += pred_correct
+        total_sample_num += answers.shape[0]
+
+        del loss, pred_answers, probs
+
+    model.train()
+    return total_loss / total_sample_num, total_correct / total_sample_num
+
+
+
 def trainModel(model, train_data, valid_data, optimizer):
+
+    start_time = time.time()
+
     def trainEpoch(epoch):
         train_data.shuffle()
         batch_num = train_data.batch_num
 
         total_correct = 0
         total_loss = 0
-        total = 0
+        total_sample_num = 0
+
         for i in range(batch_num):
             (docs, doc_lengths), (querys,
                                   query_lengths), answers = train_data[i]
+
             optimizer.zero_grad()
 
-            probs, pred_answers = model(docs, doc_lengths, querys,
-                                        query_lengths, answers)
+            probs, pred_answers = model(docs.cuda(), doc_lengths.cuda(),
+                                        querys.cuda(), query_lengths.cuda(),
+                                        answers.cuda())
 
             loss, pred_correct = loss_func(answers, pred_answers, probs)
 
@@ -109,45 +139,61 @@ def trainModel(model, train_data, valid_data, optimizer):
             for parameter in model.parameters():
                 parameter.grad.data.clamp_(-5.0, 5.0)
 
+            # update parameters
             optimizer.step()
 
             total_loss += loss
             total_correct += pred_correct
-            total += answers.shape[0]
+            total_sample_num += answers.shape[0]
 
-            print(
-                'Epoch %d, %d th batch, avg loss: %.2f, avg correct_num: %.2f'
-                % (epoch, i, loss / answers.shape[0], pred_correct / answers.shape[0]))
+            end_time = time.time()
+
+            if i % 100 == 0:
+                with open('./log.txt', 'a') as f:
+                    print(
+                        "Epoch %d, %d th batch, avg loss: %.2f, acc: %6.2f; %6.0f s elapsed"
+                        % (epoch, i, total_loss / total_sample_num,
+                           total_correct / total_sample_num * 100,
+                           end_time - start_time),
+                        file=f)
 
             del loss, pred_answers, probs
 
-        return total_loss / total, total_correct / total
-
+        return total_loss / total_sample_num, total_correct / total_sample_num
 
     for epoch in range(params.epoch):
+
+        # 1. train
         train_loss, train_acc = trainEpoch(epoch)
-        print('Epoch %d:\t average loss: %.2f\t train accuracy: %g' %
-              (epoch, train_loss, train_acc * 100))
-         
-        # model_state_dict = model.state_dict()
-        # optimizer_state_dict = optimizer.state_dict()
 
-        # checkpoint = {
-        #     'model': model_state_dict,
-        #     'epoch': epoch,
-        #     'optimizer': optimizer_state_dict,
-        #     'opt': params,
-        # }
-        # torch.save(
-        #     checkpoint, 'model/%s_epoch%d_acc_%.2f.pt' %
-        #     (opt.save_model, epoch, 100 * valid_acc))
+        with open('./log.txt', 'a') as f:
+            print('Epoch %d:\t average loss: %.2f\t train accuracy: %g' %
+                  (epoch, train_loss, train_acc * 100),
+                  file=f)
+
+        # 2. evaluate on valid dataset
+        valid_loss, valid_acc = eval(model, valid_data)
+        with open('./log.txt', 'a') as f:
+            print('=' * 20)
+            print('Evaluating on validation set:', file=f)
+            print('Validation loss: %.2f' % valid_loss, file=f)
+            print('Validation accuracy: %g' % (valid_acc * 100), file=f)
+            print('=' * 20, file=f)
+
+        # 3. save model
+        model_state_dict = model.state_dict()
+        optimizer_state_dict = optimizer.state_dict()
+        checkpoint = {
+            'model': model_state_dict,
+            'epoch': epoch,
+            'optimizer': optimizer_state_dict,
+            'opt': params,
+        }
+        torch.save(
+            checkpoint, params.model_path + '/model_epoch%d_acc_%.2f.pt' %
+            (epoch, 100 * valid_acc))
 
 
-# TODO: Score函数，score随着epoch绘制图变化曲线
-
-
-
-# TODO: 目前已经可以在CPU上面进行训练，问题是训练速度太慢，考虑使用cuda在gpu训练，而后部署到华为云上
 def main():
 
     # 加载字典
@@ -174,8 +220,8 @@ def main():
                      lr=params.lr,
                      weight_decay=params.dropout)
 
-    # 训练模型
-    trainModel(model, batched_train_data, batched_valid_data,optimizer)
+    # 训练模型并保存
+    trainModel(model, batched_train_data, batched_valid_data, optimizer)
 
 
 if __name__ == "__main__":
