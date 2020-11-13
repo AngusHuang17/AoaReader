@@ -154,8 +154,8 @@ def trainModel(model, train_data, valid_data, optimizer):
             # update parameters
             optimizer.step()
 
-            total_loss += loss
-            total_correct += pred_correct
+            total_loss += loss.data[0]
+            total_correct += pred_correct.data
             total_sample_num += answers.shape[0]
 
             end_time = time.time()
