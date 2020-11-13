@@ -241,7 +241,7 @@ def main():
                          
     
     if train_from:
-        print('Loading model from checkpoint at %s' % opt.train_from)
+        print('Loading model from checkpoint at %s' % params.train_from)
         chk_model = checkpoint['model']
         model.load_state_dict(chk_model)
         params.start_epoch = checkpoint['epoch'] + 1
