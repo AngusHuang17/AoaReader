@@ -111,8 +111,8 @@ def eval(model, data):
                                     answers)
         loss, pred_correct = loss_func(answers, pred_answers, probs)
 
-        total_loss += loss
-        total_correct += pred_correct
+        total_loss += loss.data[0]
+        total_correct += pred_correct.data
         total_sample_num += answers.shape[0]
 
         del loss, pred_answers, probs
