@@ -94,7 +94,7 @@ def loss_func(true_answers, pred_answers, probs):
     '''
     loss = - torch.sum(torch.log(probs), dim=0, keepdim=True)
     num_correct = (true_answers.squeeze() == pred_answers).sum().squeeze().data
-    return loss.cuda(), num_correct
+    return loss.cuda(), num_correct.float()
 
 def eval(model, data):
     total_correct = 0
@@ -202,6 +202,9 @@ def main():
     localtime = time.asctime( time.localtime(time.time()) )
     print(localtime)
     print('-' * 20)
+    
+    # 清空显存
+    torch.cuda.empty_cache()
     
     global params
     train_from = params.train_from
