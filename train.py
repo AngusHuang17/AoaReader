@@ -6,12 +6,8 @@ from utils.dataloader import myDataloader
 from model.model import ATT_model
 from torch.optim import Adam
 import time
-'''
-step1: 数据读入
-step2: 实例化模型
-step3: 使用一个for循环进行训练，其步骤有模型读入数据输出，计算损失函数，反向传播，优化算法更新参数
-step4: 存储模型
-'''
+
+
 
 # 命令行参数设定
 parser = argparse.ArgumentParser(description='Train AoAReader model.')
@@ -22,26 +18,24 @@ parser.add_argument(
     help=
     'Path to the train_vec.pickle file from pre_train.py, default value is \'./temp/train_vec.pickle\''
 )
+
 parser.add_argument(
     '-validdata',
     default='./temp/valid_vec.pickle',
     help=
     'Path to the valid_vec.pickle file from pre_train.py, default value is \'./temp/valid_vec.pickle\''
 )
+
 parser.add_argument(
     '-dict',
     default='./temp/dictionary.pickle',
     help=
     'Path to the dictionary file from pre_train.py, default value is \'./temp/dictionary.pickle\''
 )
-parser.add_argument('-model_path',
-                    default='./model',
-                    help="""Model filename (the model will be saved as
-                    model_epochN_ACC.pt to <model_path> directory, where ACC is the
-                    validation accuracy""")
-parser.add_argument('-log_path', default='./', help="Path to save log file.")
+
 
 parser.add_argument('-batch_size', type=int, default=32, help='batch size')
+
 parser.add_argument('-embedding_size',
                     type=int,
                     default=384,
@@ -60,10 +54,32 @@ parser.add_argument('-l2',
                     default=0.0001,
                     help='L2 regularization')
 parser.add_argument('-dropout', type=float, default=0.1, help='Dropout rate')
+parser.add_argument('-start_epoch', type=int, default=1,
+                    help='The epoch from which to start')
+
+
+parser.add_argument('-train_from', default='', type=str,
+                help="""If training from a checkpoint then this is the
+                path to the pre-trained model.""")
+
+parser.add_argument('-log_interval', type=int, default=50,
+                    help="Print stats at this interval (minibatches).")
+
+parser.add_argument('-model_path',
+                    default='./model',
+                    help="""Model filename (the model will be saved as
+                    model_epochN_ACC.pt to <model_path> directory, where ACC is the
+                    validation accuracy""")
+
+parser.add_argument('-log_path', default='./', help="Path to save log file.")
+
+
+parser.add_argument('-gpu', default=True, type=bool,
+                    help="whether to use gpu")
 
 params = parser.parse_args()
 print(params)
-
+    
 
 def loss_func(true_answers, pred_answers, probs):
     '''Calculate the loss with formulate loss = -sum(log(p(x))), x in answers
@@ -76,13 +92,9 @@ def loss_func(true_answers, pred_answers, probs):
         loss: -sum(log(probs(x)))
         correct_num: numbers of (true_answer==pred_answer)
     '''
-    loss = -1 * torch.sum(torch.log(probs))
-    compare = true_answers.squeeze() == pred_answers
-    correct_num = 0
-    for i in compare:
-        if i:
-            correct_num += 1
-    return loss, correct_num
+    loss = - torch.sum(torch.log(probs), dim=0, keepdim=True)
+    num_correct = (true_answers.squeeze() == pred_answers).sum().squeeze().data
+    return loss.cuda(), num_correct
 
 def eval(model, data):
     total_correct = 0
@@ -93,9 +105,10 @@ def eval(model, data):
     
     model.eval()
     for i in range(batch_num):
-        (docs, doc_lengths), (querys, query_lengths), answers = data[i]
-        probs, pred_answers = model(docs.cuda(), doc_lengths.cuda(), querys.cuda(),
-                                        query_lengths.cuda(), answers.cuda())
+        (docs, doc_lengths, doc_masks), (querys, query_lengths, query_masks), answers = data[i]
+        probs, pred_answers = model(docs, doc_lengths, doc_masks,
+                                    querys, query_lengths, query_masks,
+                                    answers)
         loss, pred_correct = loss_func(answers, pred_answers, probs)
 
         total_loss += loss
@@ -122,14 +135,13 @@ def trainModel(model, train_data, valid_data, optimizer):
         total_sample_num = 0
 
         for i in range(batch_num):
-            (docs, doc_lengths), (querys,
-                                  query_lengths), answers = train_data[i]
+            (docs, doc_lengths, doc_masks), (querys, query_lengths, query_masks), answers = train_data[i]
 
             optimizer.zero_grad()
 
-            probs, pred_answers = model(docs.cuda(), doc_lengths.cuda(),
-                                        querys.cuda(), query_lengths.cuda(),
-                                        answers.cuda())
+            probs, pred_answers = model(docs, doc_lengths, doc_masks,
+                                        querys, query_lengths, query_masks,
+                                        answers)
 
             loss, pred_correct = loss_func(answers, pred_answers, probs)
 
@@ -148,14 +160,10 @@ def trainModel(model, train_data, valid_data, optimizer):
 
             end_time = time.time()
 
-            if i % 100 == 0:
-                with open('./log.txt', 'a') as f:
-                    print(
-                        "Epoch %d, %d th batch, avg loss: %.2f, acc: %6.2f; %6.0f s elapsed"
-                        % (epoch, i, total_loss / total_sample_num,
-                           total_correct / total_sample_num * 100,
-                           end_time - start_time),
-                        file=f)
+            if i % params.log_interval == 0:
+                print( "Epoch %d, %d th batch, avg loss: %.2f, acc: %6.2f; %6.0f s elapsed"
+                    % (epoch, i, total_loss / total_sample_num, total_correct / total_sample_num * 100,
+                       end_time - start_time))
 
             del loss, pred_answers, probs
 
@@ -163,50 +171,57 @@ def trainModel(model, train_data, valid_data, optimizer):
 
     for epoch in range(params.epoch):
 
-        # 1. train
+        # 1. 训练集上训练一个epoch
         train_loss, train_acc = trainEpoch(epoch)
 
-        with open('./log.txt', 'a') as f:
-            print('Epoch %d:\t average loss: %.2f\t train accuracy: %g' %
-                  (epoch, train_loss, train_acc * 100),
-                  file=f)
+        print('Epoch %d:\t average loss: %.2f\t train accuracy: %g' % (epoch, train_loss, train_acc * 100))
 
-        # 2. evaluate on valid dataset
+        # 2. 验证集上评估
         valid_loss, valid_acc = eval(model, valid_data)
-        with open('./log.txt', 'a') as f:
-            print('=' * 20)
-            print('Evaluating on validation set:', file=f)
-            print('Validation loss: %.2f' % valid_loss, file=f)
-            print('Validation accuracy: %g' % (valid_acc * 100), file=f)
-            print('=' * 20, file=f)
+        print('=' * 20)
+        print('Evaluating on validation set:')
+        print('Validation loss: %.2f' % valid_loss)
+        print('Validation accuracy: %g' % (valid_acc * 100))
+        print('=' * 20)
 
-        # 3. save model
+        # 3. 每个epoch保存模型
         model_state_dict = model.state_dict()
         optimizer_state_dict = optimizer.state_dict()
         checkpoint = {
             'model': model_state_dict,
             'epoch': epoch,
             'optimizer': optimizer_state_dict,
-            'opt': params,
+            'params': params,
         }
-        torch.save(
-            checkpoint, params.model_path + '/model_epoch%d_acc_%.2f.pt' %
-            (epoch, 100 * valid_acc))
+        torch.save( checkpoint, params.model_path + '/model_epoch%d_acc_%.2f.pt' % (epoch, 100 * valid_acc))
 
 
 def main():
-
+    # 打印当前时间
+    print('-' * 20)
+    localtime = time.asctime( time.localtime(time.time()) )
+    print(localtime)
+    print('-' * 20)
+    
+    global params
+    train_from = params.train_from
+    if params.train_from:
+        train_from = True
+        print("Trains from " + params.train_from)
+        checkpoint = torch.load(params.train_from)
+        params = checkpoint['params']
+    
     # 加载字典
     with open(params.dict, 'rb') as f:
         dictionary = pickle.load(f)
 
     # 加载数据
-    with open(params.traindata, 'rb') as tr, open(params.validdata, 'rb') as v:
-        train_vec = pickle.load(tr)
+    with open(params.traindata, 'rb') as t, open(params.validdata, 'rb') as v:
+        train_vec = pickle.load(t)
         valid_vec = pickle.load(v)
 
-    batched_train_data = myDataloader(dictionary, train_vec, params.batch_size)
-    batched_valid_data = myDataloader(dictionary, valid_vec, params.batch_size)
+    batched_train_data = myDataloader(dictionary, train_vec, True, params.batch_size)
+    batched_valid_data = myDataloader(dictionary, valid_vec, True, params.batch_size)
 
     # 模型实例化
     model = ATT_model(vocab_size=dictionary.len,
@@ -214,11 +229,32 @@ def main():
                       hidden_dim=params.gru_size,
                       dropout_rate=params.dropout,
                       PAD=0)
+    # 模型参数个数
+    nParams = sum([p.nelement() for p in model.parameters()])
+    print('* number of parameters: %d' % nParams)
+                         
+    # 使用多个gpu加速
+    if params.gpu:
+        model.cuda()
+    if torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model)
+                         
+    
+    if train_from:
+        print('Loading model from checkpoint at %s' % opt.train_from)
+        chk_model = checkpoint['model']
+        model.load_state_dict(chk_model)
+        params.start_epoch = checkpoint['epoch'] + 1
 
     # 优化器
     optimizer = Adam(model.parameters(),
                      lr=params.lr,
                      weight_decay=params.dropout)
+                         
+    if train_from:
+       optimizer.load_state_dict(checkpoint['optimizer'])
+                         
+
 
     # 训练模型并保存
     trainModel(model, batched_train_data, batched_valid_data, optimizer)

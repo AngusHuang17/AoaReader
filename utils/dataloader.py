@@ -30,11 +30,19 @@ def get_preds(docs, probs, lengths):
     return indexs
 
 
+def create_mask(seq_lens):
+    mask = torch.zeros(len(seq_lens), torch.max(seq_lens))
+    for i, seq_len in enumerate(seq_lens):
+        mask[i][:seq_len] = 1
+
+    return mask.float()
+
+
 class myDataloader():
     '''Dataloader is a class which aims to convert sequence vector to one-hot matrix
     and bacth the data
     '''
-    def __init__(self, dic: Dictionary, data, batch_size: int):
+    def __init__(self, dic: Dictionary, data, cuda, batch_size: int):
         '''Initialize the dataloader
 
         Args:
@@ -49,6 +57,7 @@ class myDataloader():
         self.answer = data['answer']
         self.sample_num = len(self.document)
         self.batch_num = math.ceil(self.sample_num / self.batch_size)
+        self.cuda = cuda
 
     def shuffle(self):
         '''shuffle the dataset
@@ -84,6 +93,32 @@ class myDataloader():
         querys, query_lengths = self._batch(self.query[start_index:end_index])
 
         answers = torch.tensor(self.answer[start_index:end_index])
+        
+        def wrap(b: torch.LongTensor):
+            if b is None:
+                return b
+            if self.cuda:
+                b = b.cuda()
+            b = Variable(b, requires_grad=False)
+            return b
+        
+        # mask
+#         doc_max_len = docs.shape[1]
+#         doc_masks = torch.tensor([[1 for i in range(len)] +
+#                                   [0 for i in range(doc_max_len - len)]
+#                                   for len in doc_lengths])
+#         doc_masks.float()
+ 
+#         query_max_len = querys.shape[1]
+#         query_masks = torch.tensor([[1 for i in range(len)] +
+#                                     [0 for i in range(query_max_len - len)]
+#                                     for len in query_lengths])
+#         query_masks.float()
+        doc_masks = create_mask(doc_lengths)
+        query_masks = create_mask(query_lengths)
+
+        doc_masks = doc_masks.unsqueeze(2)
+        query_masks = query_masks.unsqueeze(2)
 
         # docs = Variable(docs, requires_grad=False)
         # doc_lengths = Variable(doc_lengths, requires_grad=False)
@@ -91,4 +126,5 @@ class myDataloader():
         # query_lengths = Variable(query_lengths, requires_grad=False)
         # answers = Variable(answers, requires_grad=False)
 
-        return (docs, doc_lengths), (querys, query_lengths), answers
+#         return (docs, doc_lengths), (querys, query_lengths), answers
+        return (wrap(docs), wrap(doc_lengths), wrap(doc_masks)), (wrap(querys), wrap(query_lengths), wrap(query_masks)),wrap(answers)

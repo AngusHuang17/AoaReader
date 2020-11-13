@@ -17,7 +17,7 @@ def sort_batch(data, lens):
 def softmax_mask(input, mask, axis=1, epsilon=1e-12):
     shift, _ = torch.max(input, axis, keepdim=True)
     shift = shift.expand_as(input).cuda()
-    input = torch.exp(input - shift) * mask.cuda()
+    input = torch.exp(input - shift) * mask
     sum = torch.sum(input, axis, keepdim=True).expand_as(input)
     softmax = input / (sum + epsilon)
     return softmax.cuda()
@@ -37,7 +37,7 @@ class ATT_model(nn.Module):
         self.hidden_dim = hidden_dim
         self.dropout_rate = dropout_rate
 
-        self.embedding = nn.Embedding(self.vocab_size,
+        self.embedding = nn.Embedding(self.vocab_size+1,
                                       self.embed_dim,
                                       padding_idx=PAD)
         self.embedding.weight.data.uniform_(-0.05, 0.05)
@@ -53,7 +53,7 @@ class ATT_model(nn.Module):
             if len(weight.size()) > 1:
                 weigth_init.orthogonal_(weight.data)
 
-    def forward(self, documents, doc_lens, querys, query_lens, answers):
+    def forward(self, documents, doc_lens, doc_masks, querys, query_lens, query_masks, answers):
 
         (sorted_documents,
          sorted_doc_lens), recover_idx_doc = sort_batch(documents, doc_lens)
@@ -82,17 +82,6 @@ class ATT_model(nn.Module):
         document_gru_output = document_gru_output[recover_idx_doc]
         query_gru_output = query_gru_output[recover_idx_query]
 
-        # mask
-        doc_max_len = documents.shape[1]
-        doc_masks = torch.tensor([[1 for i in range(len)] +
-                                  [0 for i in range(doc_max_len - len)]
-                                  for len in doc_lens])
-        query_max_len = querys.shape[1]
-        query_masks = torch.tensor([[1 for i in range(len)] +
-                                    [0 for i in range(query_max_len - len)]
-                                    for len in query_lens])
-        doc_masks = doc_masks.unsqueeze(2)
-        query_masks = query_masks.unsqueeze(2)
 
         # Pair-wise Matching score
         IndiATT_output = torch.bmm(document_gru_output,
@@ -112,11 +101,13 @@ class ATT_model(nn.Module):
         answer_masks = answers_expand == documents
 
         # probs 表示真实答案在预测中的概率
-        probs = torch.zeros(answers.shape[0])
+        probs = []
 
         for i in range(answers.shape[0]):
-            probs[i] = torch.sum(
-                torch.masked_select(AoA_output[i].squeeze(), answer_masks[i]))
+            probs.append(
+                torch.sum(torch.masked_select(AoA_output[i].squeeze(), answer_masks[i]), 0, keepdim=True)
+            )
+        probs = torch.cat(probs, 0).squeeze()
 
         # pred_answers 表示从documents中选取概率最大的单词作为预测
         pred_answers = []
@@ -124,14 +115,24 @@ class ATT_model(nn.Module):
             dict = {}
             len = doc_lens[j]
             s = AoA_output[j].squeeze()
-            for i, word in enumerate(document):
-                if i >= len:
-                    break
+            for i, word in enumerate(document[:len]):
                 if word not in dict:
                     dict[word] = s[i].data
                 else:
                     dict[word] += s[i].data
             pred_answers.append(max(dict, key=dict.get))
-        pred_answers = torch.LongTensor(pred_answers)
+        pred_answers = torch.LongTensor(pred_answers).cuda()
+#         debug = []
+#         for i, document in enumerate(documents):
+#             prob = []
+#             s = AoA_output[i].squeeze()
+#             for j, word in enumerate(document[:doc_lens[i]]):
+#                 mask = document == word.expand_as(document)
+#                 prob.append(torch.sum(torch.masked_select(s, mask), 0, keepdim=True))
+#             prob = torch.cat(prob, dim=0).squeeze()
+#             _ , max_index = torch.max(prob, 0)
+#             pred_answers.append(document.index_select(0, max_index))
+#             debug.append(prob)
+#         pred_answers = torch.cat(pred_answers, dim=0).squeeze()
 
         return probs, pred_answers
