@@ -43,7 +43,7 @@ parser.add_argument('-embedding_size',
 parser.add_argument('-gru_size', type=int, default=256, help='GRU layer size')
 parser.add_argument('-epoch',
                     type=int,
-                    default=10,
+                    default=5,
                     help='Number of training epochs')
 parser.add_argument('-lr',
                     type=float,
@@ -92,7 +92,7 @@ def loss_func(true_answers, pred_answers, probs):
         loss: -sum(log(probs(x)))
         correct_num: numbers of (true_answer==pred_answer)
     '''
-    loss = - torch.sum(torch.log(probs), dim=0, keepdim=True)
+    loss = - torch.mean(torch.log(probs), dim=0, keepdim=True)
     num_correct = (true_answers.squeeze() == pred_answers).sum().squeeze().data
     return loss.cuda(), num_correct.float()
 
@@ -154,9 +154,10 @@ def trainModel(model, train_data, valid_data, optimizer):
             # update parameters
             optimizer.step()
 
-            total_loss += loss.data[0]
+            current_batch_num = answers.shape[0]
+            total_loss += loss.data[0] * current_batch_num
             total_correct += pred_correct.data
-            total_sample_num += answers.shape[0]
+            total_sample_num += current_batch_num
 
             end_time = time.time()
 
@@ -252,7 +253,7 @@ def main():
     # 优化器
     optimizer = Adam(model.parameters(),
                      lr=params.lr,
-                     weight_decay=params.dropout)
+                     weight_decay=params.l2)
                          
     if train_from:
        optimizer.load_state_dict(checkpoint['optimizer'])
