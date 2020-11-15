@@ -238,11 +238,11 @@ def main():
     print('* number of parameters: %d' % nParams)
                          
     # 使用多个gpu加速
-    if params.gpu:
-        model.cuda()
     if torch.cuda.device_count() > 1:
         model = torch.nn.DataParallel(model)
-                         
+    if params.gpu:
+        model.cuda()
+          
     
     if train_from:
         print('Loading model from checkpoint at %s' % params.train_from)
