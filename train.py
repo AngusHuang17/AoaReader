@@ -251,9 +251,8 @@ def main():
         params.start_epoch = checkpoint['epoch'] + 1
 
     # 优化器
-    optimizer = Adam(model.parameters(),
-                     lr=params.lr,
-                     weight_decay=params.l2)
+    optimizer = Adam([{'params': model.embedding.parameters(), 'weight_decay':params.l2},
+                  {'params': model.BiGRU.parameters()}], lr=params.lr)
                          
     if train_from:
        optimizer.load_state_dict(checkpoint['optimizer'])
