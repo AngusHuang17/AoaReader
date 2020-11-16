@@ -2,8 +2,6 @@ from tqdm import tqdm
 from collections import Counter
 from utils.dict import Dictionary
 import pickle
-import torch
-from utils.dataloader import myDataloader
 import re
 import os
 
