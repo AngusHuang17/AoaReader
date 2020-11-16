@@ -6,31 +6,39 @@ from utils.dataloader import myDataloader
 from model.model import ATT_model
 from torch.optim import Adam
 import time
+import os
+from pre_train import build_dict, vectorize
 
 
 
 # 命令行参数设定
 parser = argparse.ArgumentParser(description='Train AoAReader model.')
 
-parser.add_argument(
-    '-traindata',
-    default='./temp/train_vec.pickle',
-    help=
-    'Path to the train_vec.pickle file from pre_train.py, default value is \'./temp/train_vec.pickle\''
-)
+# parser.add_argument(
+#     '-traindata',
+#     default='./temp/train_vec.pickle',
+#     help=
+#     'Path to the train_vec.pickle file from pre_train.py, default value is \'./temp/train_vec.pickle\''
+# )
+
+# parser.add_argument(
+#     '-validdata',
+#     default='./temp/valid_vec.pickle',
+#     help=
+#     'Path to the valid_vec.pickle file from pre_train.py, default value is \'./temp/valid_vec.pickle\''
+# )
+
+# parser.add_argument(
+#     '-dict',
+#     default='./temp/dictionary.pickle',
+#     help=
+#     'Path to the dictionary file from pre_train.py, default value is \'./temp/dictionary.pickle\''
+# )
 
 parser.add_argument(
-    '-validdata',
-    default='./temp/valid_vec.pickle',
-    help=
-    'Path to the valid_vec.pickle file from pre_train.py, default value is \'./temp/valid_vec.pickle\''
-)
-
-parser.add_argument(
-    '-dict',
-    default='./temp/dictionary.pickle',
-    help=
-    'Path to the dictionary file from pre_train.py, default value is \'./temp/dictionary.pickle\''
+    '-data_path',
+    default='./data',
+    help='Path the dataset cnn.'
 )
 
 
@@ -80,6 +88,55 @@ parser.add_argument('-gpu', default=True, type=bool,
 params = parser.parse_args()
 print(params)
     
+
+def preprocess():
+    # print('请输入cnn数据集文件夹的路径（path）：注意，目录结构为 path/cnn/questions, path/cnn/valid, path/cnn/test')
+    # dataset_path = input()
+    global params
+    dataset_path = params.data_path
+    dirs = [
+        '/cnn/questions/training/',
+        '/cnn/questions/validation/'
+    ]
+    dirs = [dataset_path + dir for dir in dirs]
+    # dic_cache = './temp/dictionary.pickle'
+    # if os.path.exists(dic_cache):
+    #     print("dictionary cache file existed!")
+    #     with open(dic_cache, 'rb') as f:
+    #         dictionary = pickle.load(f)
+    # else:
+        # print("dictionary cache file not found!")
+    
+
+    dic = build_dict(dirs)
+    sorted_dic, _ = zip(*dic.most_common())
+    word2id = {token: i + 1 for i, token in enumerate(sorted_dic)}
+    dictionary = Dictionary(word2id)
+        # with open(dic_cache, 'wb') as f:
+        #     pickle.dump(dictionary, f)
+
+    # 将文本转换为其id序列
+    print('Vocab size:', dictionary.len)
+    
+    # vec_cache = [
+    #     './temp/train_vec.pickle', './temp/test_vec.pickle',
+    #     './temp/valid_vec.pickle'
+    # ]
+    # vec_cache_exist = True
+    # for i in range(3):
+    #     if not os.path.exists(vec_cache[i]):
+    #         vec_cache_exist = False
+    #         for cache in vec_cache:
+    #             if os.path.exists(cache):
+    #                 os.remove(cache)
+    #         break
+    # if vec_cache_exist:
+    #     print("vector cache file exists!")
+    # else:
+    #     print("vector cache file not found!")
+    vec = vectorize(dirs, dictionary)
+    return dictionary, vec
+
 
 def loss_func(true_answers, pred_answers, probs):
     '''Calculate the loss with formulate loss = -sum(log(p(x))), x in answers
@@ -216,14 +273,20 @@ def main():
         checkpoint = torch.load(params.train_from)
         params = checkpoint['params']
     
+
+    dictionary, vec = preprocess()
+
+    train_vec = vec[0]
+    valid_vec = vec[1]
+
     # 加载字典
-    with open(params.dict, 'rb') as f:
-        dictionary = pickle.load(f)
+    # with open(params.dict, 'rb') as f:
+    #     dictionary = pickle.load(f)
 
     # 加载数据
-    with open(params.traindata, 'rb') as t, open(params.validdata, 'rb') as v:
-        train_vec = pickle.load(t)
-        valid_vec = pickle.load(v)
+    # with open(params.traindata, 'rb') as t, open(params.validdata, 'rb') as v:
+    #     train_vec = pickle.load(t)
+    #     valid_vec = pickle.load(v)
 
     batched_train_data = myDataloader(dictionary, train_vec, True, params.batch_size)
     batched_valid_data = myDataloader(dictionary, valid_vec, True, params.batch_size)
@@ -253,7 +316,7 @@ def main():
 
     # 优化器
     optimizer = Adam([{'params': model.embedding.parameters(), 'weight_decay': params.l2},
-                  {'params': model.BiGRU.parameters(), 'weight_decay': params.l2}], lr=params.lr)
+                  {'params': model.BiGRU.parameters(), 'weight_decay': 0}], lr=params.lr)
                          
     if train_from:
        optimizer.load_state_dict(checkpoint['optimizer'])

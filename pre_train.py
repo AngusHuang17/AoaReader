@@ -42,7 +42,7 @@ def build_dict(dirs):
     return dic
 
 
-def vectorize(dirs, dic, vec_cache):
+def vectorize(dirs, dic):
     '''convert the text sequence to vector
     Args:
         dirs: path to train, test, valid dataset
@@ -53,8 +53,8 @@ def vectorize(dirs, dic, vec_cache):
     '''
     print("start vectorizing...")
     files = [[dir + file for file in os.listdir(dir)] for dir in dirs]
-    vec = [{}, {}, {}]
-    for i in range(3):
+    vec = [{} for i in range(len(dirs))]
+    for i in range(len(dirs)):
         docs = []
         querys = []
         answers = []
@@ -70,11 +70,12 @@ def vectorize(dirs, dic, vec_cache):
         vec[i]['document'] = docs
         vec[i]['query'] = querys
         vec[i]['answer'] = answers
-        with open(vec_cache[i], 'wb') as f:
-            pickle.dump(vec[i], f)
+        # with open(vec_cache[i], 'wb') as f:
+        #     pickle.dump(vec[i], f)
     print("vectorizing finished, file saved.")
+    return vec
 
-
+'''
 def main():
     print('请输入cnn数据集文件夹的路径（path）：注意，目录结构为 path/cnn/questions, path/cnn/valid, path/cnn/test')
     dataset_path = input()
@@ -135,3 +136,4 @@ if __name__ == '__main__':
     # (docs, doc_lengths), (querys,
     #                       query_lengths), answers = batched_train_data[2]
     # print(doc_lengths.shape)
+'''
