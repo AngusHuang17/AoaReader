@@ -111,9 +111,10 @@ def eval(model, data):
                                     answers)
         loss, pred_correct = loss_func(answers, pred_answers, probs)
 
-        total_loss += loss.data[0]
+        current_batch_num = answers.shape[0]
+        total_loss += loss.data[0] * current_batch_num
         total_correct += pred_correct.data
-        total_sample_num += answers.shape[0]
+        total_sample_num += current_batch_num
 
         del loss, pred_answers, probs
 
@@ -251,8 +252,8 @@ def main():
         params.start_epoch = checkpoint['epoch'] + 1
 
     # 优化器
-    optimizer = Adam([{'params': model.embedding.parameters(), 'weight_decay':params.l2},
-                  {'params': model.BiGRU.parameters()}], lr=params.lr)
+    optimizer = Adam([{'params': model.embedding.parameters(), 'weight_decay': params.l2},
+                  {'params': model.BiGRU.parameters(), 'weight_decay': params.l2}], lr=params.lr)
                          
     if train_from:
        optimizer.load_state_dict(checkpoint['optimizer'])

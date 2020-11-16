@@ -33,9 +33,9 @@ def build_dict(dirs):
     for file in tqdm(files):
         with open(file, 'r', encoding='utf8') as f:
             whole = f.readlines()
-            document = remove_sig(whole[2])
-            query = remove_sig(whole[4])
-            answer = remove_sig(whole[6])
+            document = whole[2].lower()
+            query = whole[4].lower()
+            answer = whole[6].lower()
             for word in document.split() + query.split() + answer.split():
                 dic[word] += 1
     print("building dictionary finished!")
@@ -61,12 +61,12 @@ def vectorize(dirs, dic, vec_cache):
         for file in tqdm(files[i]):
             with open(file, 'r', encoding='utf8') as f:
                 whole = f.readlines()
-                document = remove_sig(whole[2]).split()
-                query = remove_sig(whole[4]).split()
-                answer = remove_sig(whole[6])
+                document = whole[2].lower().split()
+                query = whole[4].lower().split()
+                answer = whole[6].lower().split()
                 docs.append([dic.getId(word) for word in document])
                 querys.append([dic.getId(word) for word in query])
-                answers.append([dic.getId(word) for word in answer.split()])
+                answers.append([dic.getId(word) for word in answer])
         vec[i]['document'] = docs
         vec[i]['query'] = querys
         vec[i]['answer'] = answers
@@ -86,6 +86,8 @@ def main():
     dic_cache = './temp/dictionary.pickle'
     if os.path.exists(dic_cache):
         print("dictionary cache file existed!")
+        with open(dic_cache, 'rb') as f:
+            dictionary = pickle.load(f)
     else:
         print("dictionary cache file not found!")
         dic = build_dict(dirs)
@@ -96,6 +98,8 @@ def main():
             pickle.dump(dictionary, f)
 
     # 将文本转换为其id序列
+    print('Vocab size:', dictionary.len)
+    
     vec_cache = [
         './temp/train_vec.pickle', './temp/test_vec.pickle',
         './temp/valid_vec.pickle'
